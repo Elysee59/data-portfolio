@@ -1,0 +1,57 @@
+// Power BI measures for an HR dashboard built on data/employees.csv
+// Model: table 'Employees' + a 'Date' table (marked as date table, not linked;
+// the measures use the date in context explicitly).
+
+Headcount =
+VAR d = MAX ( 'Date'[Date] )
+RETURN
+    CALCULATE (
+        COUNTROWS ( Employees ),
+        Employees[hire_date] <= d,
+        OR ( ISBLANK ( Employees[leave_date] ), Employees[leave_date] > d )
+    )
+
+Leavers =
+CALCULATE (
+    COUNTROWS ( Employees ),
+    FILTER (
+        Employees,
+        Employees[leave_date] >= MIN ( 'Date'[Date] )
+            && Employees[leave_date] <= MAX ( 'Date'[Date] )
+    )
+)
+
+Hires =
+CALCULATE (
+    COUNTROWS ( Employees ),
+    FILTER (
+        Employees,
+        Employees[hire_date] >= MIN ( 'Date'[Date] )
+            && Employees[hire_date] <= MAX ( 'Date'[Date] )
+    )
+)
+
+Average Headcount =
+AVERAGEX (
+    VALUES ( 'Date'[MonthEnd] ),
+    VAR m = 'Date'[MonthEnd]
+    RETURN CALCULATE ( [Headcount], 'Date'[Date] = m )
+)
+
+Turnover Rate 12M =
+VAR endDate = MAX ( 'Date'[Date] )
+VAR period = DATESINPERIOD ( 'Date'[Date], endDate, -12, MONTH )
+RETURN
+    DIVIDE ( CALCULATE ( [Leavers], period ), CALCULATE ( [Average Headcount], period ) )
+
+Median Salary Women =
+CALCULATE ( MEDIAN ( Employees[annual_salary_eur] ), Employees[gender] = "F", ISBLANK ( Employees[leave_date] ) )
+
+Median Salary Men =
+CALCULATE ( MEDIAN ( Employees[annual_salary_eur] ), Employees[gender] = "M", ISBLANK ( Employees[leave_date] ) )
+
+Pay Gap % =
+DIVIDE ( [Median Salary Men] - [Median Salary Women], [Median Salary Men] )
+
+Avg Absence Days =
+CALCULATE ( AVERAGE ( Employees[absence_days_last_12m] ), ISBLANK ( Employees[leave_date] ) )

@@ -1,0 +1,15 @@
+Atelier Vélo Lumière SARL (fictional)
+12 rue des Rayons, 59000 Lille
+
+Facture N° FA-2025-0412
+Date de facture : 03/11/2025
+Échéance : 03/12/2025
+
+Désignation | Qté | Prix unitaire | Total
+- Chambre à air 700x28 | 40 | 4,50 | 180,00
+- Pneu route 700x28 | 12 | 32,00 | 384,00
+- Câble de frein inox | 25 | 3,20 | 80,00
+
+Total HT : 644,00 €
+TVA (20%) : 128,80 €
+Total TTC : 772,80 €

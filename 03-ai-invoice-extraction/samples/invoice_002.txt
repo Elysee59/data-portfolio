@@ -1,0 +1,14 @@
+Northwind Outdoor Supplies Ltd (fictional)
+London, United Kingdom
+
+Invoice No: NW-88213
+Invoice date: 2025-10-28
+Due date: 2025-11-27
+
+Item | Qty | Unit price | Amount
+- Trail running shoes, size mix | 30 | 54.00 | 1,620.00
+- Hydration vest 5L | 15 | 38.50 | 577.50
+
+Total excl. tax: 2,197.50 EUR
+VAT (20%): 439.50 EUR
+Total incl. tax: 2,637.00 EUR
