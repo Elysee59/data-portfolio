@@ -62,4 +62,4 @@ Each project folder has its own README with the commands to run it.
 
 ## Contact
 
-[LinkedIn](https://www.linkedin.com/) · open to remote freelance missions and full-time roles.
+[LinkedIn](https://www.linkedin.com/in/elysee-mugabire/) · open to remote freelance missions and full-time roles.
