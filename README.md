@@ -14,6 +14,11 @@ All four projects are presented in an **interactive Streamlit app**: filterable 
 
 **👉 Live demo: _add your Streamlit Community Cloud link here_**
 
+<p>
+  <img src="assets/1_hr_dashboard.png" width="49%" alt="HR dashboard">
+  <img src="assets/3_agent_team_at_work.png" width="49%" alt="HR agent team at work">
+</p>
+
 Run it locally:
 
 ```bash
