@@ -71,8 +71,9 @@ def main(out_dir: Path) -> pd.DataFrame:
     hazard = hazard * np.where(level == "Director", 0.5, 1.0)
     hazard = hazard * np.where(perf >= 4, 1.15, 1.0)  # high performers get poached
 
-    observe_from = np.maximum(hire_date, START)
-    months_observable = ((END - observe_from).days / 30.44).astype(int)
+    # Start of the observation window for each employee (works with pandas 2.x and 3.x)
+    observe_from = hire_date.where(hire_date >= START, START)
+    months_observable = np.asarray((END - observe_from).days / 30.44).astype(int)
     months_to_leave = rng.geometric(np.clip(hazard, 1e-4, 0.5))
     leaves = months_to_leave <= months_observable
     leave_date = pd.Series(pd.NaT, index=range(n), dtype="datetime64[ns]")
