@@ -1,0 +1,12 @@
+[project]
+name = "hr-agents"
+version = "0.1.0"
+description = "A multi-agent People Analytics team built on the Claude Messages API."
+requires-python = ">=3.10"
+dependencies = ["pandas>=2.0", "numpy", "scikit-learn"]
+
+[project.optional-dependencies]
+llm = ["anthropic"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

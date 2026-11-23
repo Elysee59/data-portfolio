@@ -10,7 +10,7 @@ Data scientist and BI engineer (ESIEE Paris engineering degree in Data Science &
 
 ## 🚀 Interactive app
 
-All three projects are presented in an **interactive Streamlit app**: filterable HR dashboard, what-if attrition simulator, forecast explorer by store and product family, and a live invoice extraction demo.
+All four projects are presented in an **interactive Streamlit app**: filterable HR dashboard, what-if attrition simulator, forecast explorer by store and product family, a live invoice extraction demo, and a multi-agent HR team you can question.
 
 **👉 Live demo: _add your Streamlit Community Cloud link here_**
 
@@ -30,6 +30,7 @@ streamlit run Home.py
 | 01 | [HR analytics: turnover, equal pay and attrition risk](01-hr-analytics/) | Where are we losing people, is pay fair, who is likely to leave next? | HR KPIs, SQL for Databricks, Power BI DAX measures, attrition model with explainability |
 | 02 | [Demand forecasting for a sports retailer](02-sales-forecasting/) | How much should each store order 4 weeks ahead? | Rolling backtest, no data leakage, forecast error cut by ~22 % vs. current practice, bias removed |
 | 03 | [AI invoice extraction with Claude](03-ai-invoice-extraction/) | Can we stop retyping supplier invoices? | LLM structured output, business-rule validation, tests, Docker, GitHub Actions CI |
+| 04 | [HR agent team (multi-agent)](04-hr-multi-agent/) | Can an AI team answer an HR director's question in a minute? | Coordinator + 3 specialist agents, tool use, parallel sub-agents, privacy-safe tools, tests with a fake client |
 
 <p>
   <img src="01-hr-analytics/figures/attrition_drivers.png" width="49%" alt="Attrition drivers">
@@ -42,6 +43,7 @@ streamlit run Home.py
 - **HR data and people analytics:** workforce KPIs, turnover and absenteeism, equal-pay analysis, Workday reports.
 - **Forecasting and predictive models** that are tested the way they will be used.
 - **AI automation:** turning documents and repetitive tasks into structured data with LLMs, with safeguards.
+- **AI agents:** multi-agent assistants that answer business questions from your own data through controlled tools.
 
 ## Run the projects
 

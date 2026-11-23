@@ -17,6 +17,9 @@ jobs:
       - name: Invoice extractor tests
         working-directory: 03-ai-invoice-extraction
         run: pytest -q
+      - name: HR agent team tests
+        working-directory: 04-hr-multi-agent
+        run: pytest -q
       - name: HR analytics runs end to end
         working-directory: 01-hr-analytics
         run: python src/generate_data.py && python src/analysis.py
