@@ -29,7 +29,7 @@ class ClaudeExtractor:
 
         self.client = anthropic.Anthropic()
         # Set ANTHROPIC_MODEL to the model you want to use (see docs.claude.com for current model names).
-        self.model = model or os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+        self.model = model or os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5")
 
     def extract(self, text: str) -> Invoice:
         schema = Invoice.model_json_schema()

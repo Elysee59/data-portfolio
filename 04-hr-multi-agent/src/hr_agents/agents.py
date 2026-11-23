@@ -26,7 +26,7 @@ from typing import Any, Callable
 from .tools import call_tool, tool_schemas
 
 PROMPTS = Path(__file__).resolve().parents[2] / "prompts"
-DEFAULT_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+DEFAULT_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5")
 MAX_TURNS = 8  # safety net per agent loop
 
 
