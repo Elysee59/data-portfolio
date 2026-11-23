@@ -31,6 +31,7 @@
 - **Grounded answers.** Every figure must come from a tool result. Tools are ordinary, tested Python functions (pandas, a log-salary regression for the adjusted pay gap, the scikit-learn attrition model of project 01).
 - **Privacy by design.** Tools return aggregates only and suppress groups under 10 people: an agent cannot be asked "who is going to resign?", only "which groups are at risk?". The memo always reminds that no automated individual decision should be taken (GDPR).
 - **Observable.** Every step (delegation, tool call, result, report, memo) is emitted as an event; the Streamlit page streams them live, like an agent console.
+- **Cost control.** The coordinator runs on Claude Sonnet; the specialists, which only pick tools and summarise figures, run on Claude Haiku (about 20× cheaper per token). Reports and memo are kept short (output tokens cost the most), tool results are sent as compact JSON, and the app reuses the saved answer when the exact same question is asked again. The page shows the cost of each answer.
 - **Offline mode.** Without an API key, the same team runs a fixed tool plan per specialist and fills a memo template. The public demo works for free and is clearly labelled as generated without AI.
 
 ## Example (offline mode, real figures from the tools)
@@ -45,11 +46,11 @@ The adjusted pay-gap tool recovers the 4 % gap built into the synthetic data, wh
 
 ## Tests
 
-`pytest` (13 tests, no API key, no network):
+`pytest` (15 tests, no API key, no network):
 
 - every tool returns JSON, rejects bad arguments with an error message instead of crashing, and never exposes an employee ID;
 - the offline router and memo;
-- the agent loop with a **fake Claude client**: the coordinator delegates to two specialists in one turn, each specialist only sees its own tools, reports flow back into the memo, token usage is counted, and an unknown specialist is returned to the model as an error.
+- the agent loop with a **fake Claude client**: the coordinator delegates to two specialists in one turn, each specialist only sees its own tools, reports flow back into the memo, token usage and cost are counted per model, specialists run on the cheaper model, and an unknown specialist is returned to the model as an error.
 
 The Streamlit page is also tested in live mode with a fake SDK (`tests/test_app.py` at the repository root).
 
@@ -63,7 +64,7 @@ pytest
 streamlit run Home.py
 ```
 
-Live mode: add `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_MODEL`) to `.streamlit/secrets.toml` locally, or to the app's secrets on Streamlit Community Cloud. Never commit the key.
+Live mode: add `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_MODEL` for the coordinator and `ANTHROPIC_SPECIALIST_MODEL` for the specialists) to `.streamlit/secrets.toml` locally, or to the app's secrets on Streamlit Community Cloud. Never commit the key.
 
 ```python
 from hr_agents import HRAgentTeam
@@ -73,7 +74,7 @@ print(result.memo, result.input_tokens, result.output_tokens)
 
 ## Next steps
 
-Evaluation set of HR questions with expected figures (LLM-as-judge + exact checks on numbers), a memory of past memos so the team can track changes over time, prompt caching to cut costs, and an MCP server exposing the data tools to other agents.
+Evaluation set of HR questions with expected figures (LLM-as-judge + exact checks on numbers), a memory of past memos so the team can track changes over time, and an MCP server exposing the data tools to other agents.
 
 ## Credits
 

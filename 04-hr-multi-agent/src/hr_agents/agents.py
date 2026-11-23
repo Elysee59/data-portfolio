@@ -27,7 +27,26 @@ from .tools import call_tool, tool_schemas
 
 PROMPTS = Path(__file__).resolve().parents[2] / "prompts"
 DEFAULT_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5")
+# Specialists do simple work (pick a tool, read figures, summarise): a smaller, much cheaper model is enough.
+DEFAULT_SPECIALIST_MODEL = os.environ.get("ANTHROPIC_SPECIALIST_MODEL", "claude-haiku-5-5")
 MAX_TURNS = 8  # safety net per agent loop
+MAX_TOKENS_SPECIALIST = 700   # short reports: output tokens are the most expensive
+MAX_TOKENS_COORDINATOR = 1200
+
+# USD per million tokens (input, output), from platform.claude.com/docs/en/about-claude/pricing (Nov 2026).
+# Update when prices change. Haiku 5.5 base tier shown (prompts up to 100k tokens).
+PRICES_PER_MTOK = {"claude-sonnet-5-5": (2.0, 10.0), "claude-haiku-5-5": (0.10, 0.50), "claude-opus-5-5": (4.0, 20.0)}
+
+
+def estimate_cost(usage_by_model: dict[str, tuple[int, int]]) -> float | None:
+    """Cost in USD, or None if a model has no known price."""
+    total = 0.0
+    for model, (tin, tout) in usage_by_model.items():
+        if model not in PRICES_PER_MTOK:
+            return None
+        pin, pout = PRICES_PER_MTOK[model]
+        total += tin * pin / 1e6 + tout * pout / 1e6
+    return total
 
 
 @dataclass(frozen=True)
@@ -78,20 +97,32 @@ class RunResult:
     events: list[Event] = field(default_factory=list)
     input_tokens: int = 0
     output_tokens: int = 0
+    usage_by_model: dict[str, tuple[int, int]] = field(default_factory=dict)
+    cost_usd: float | None = None
 
 
 class _Usage:
+    """Thread-safe token counter, per model (specialists run in parallel threads)."""
+
     def __init__(self):
-        self.input = 0
-        self.output = 0
+        self.by_model: dict[str, list[int]] = {}
         self._lock = threading.Lock()
 
-    def add(self, response):
+    def add(self, model: str, response):
         u = getattr(response, "usage", None)
         if u is not None:
             with self._lock:
-                self.input += getattr(u, "input_tokens", 0) or 0
-                self.output += getattr(u, "output_tokens", 0) or 0
+                row = self.by_model.setdefault(model, [0, 0])
+                row[0] += getattr(u, "input_tokens", 0) or 0
+                row[1] += getattr(u, "output_tokens", 0) or 0
+
+    @property
+    def input(self) -> int:
+        return sum(v[0] for v in self.by_model.values())
+
+    @property
+    def output(self) -> int:
+        return sum(v[1] for v in self.by_model.values())
 
 
 def _text(response) -> str:
@@ -111,13 +142,17 @@ def _assistant_content(response) -> list[dict]:
 
 class HRAgentTeam:
     def __init__(self, client=None, model: str | None = None, on_event: Callable[[Event], None] | None = None,
-                 thread_setup: Callable[[], None] | None = None):
-        """``thread_setup`` runs at the start of each specialist thread (e.g. to attach a UI context)."""
+                 thread_setup: Callable[[], None] | None = None, specialist_model: str | None = None):
+        """``model`` drives the coordinator, ``specialist_model`` the specialists.
+
+        ``thread_setup`` runs at the start of each specialist thread (e.g. to attach a UI context).
+        """
         if client is None:
             import anthropic  # lazy: the rest of the package works without the SDK
             client = anthropic.Anthropic()
         self.client = client
         self.model = model or DEFAULT_MODEL
+        self.specialist_model = specialist_model or DEFAULT_SPECIALIST_MODEL
         self.on_event = on_event or (lambda e: None)
         self.thread_setup = thread_setup
         self.events: list[Event] = []
@@ -135,9 +170,9 @@ class HRAgentTeam:
         messages: list[dict] = [{"role": "user", "content": task}]
         for _ in range(MAX_TURNS):
             response = self.client.messages.create(
-                model=self.model, max_tokens=1500, system=spec.system_prompt(),
+                model=self.specialist_model, max_tokens=MAX_TOKENS_SPECIALIST, system=spec.system_prompt(),
                 tools=tool_schemas(spec.tools), messages=messages)
-            self.usage.add(response)
+            self.usage.add(self.specialist_model, response)
             if response.stop_reason != "tool_use":
                 report = _text(response)
                 self._emit(type="specialist_done", agent=key, name=spec.name, report=report)
@@ -151,7 +186,7 @@ class HRAgentTeam:
                 result = call_tool(block.name, block.input)
                 self._emit(type="tool_result", agent=key, tool=block.name, result=result)
                 results.append({"type": "tool_result", "tool_use_id": block.id,
-                                "content": json.dumps(result, default=str),
+                                "content": json.dumps(result, default=str, separators=(",", ":")),
                                 **({"is_error": True} if "error" in result else {})})
             messages.append({"role": "user", "content": results})
         report = "Stopped: too many tool calls without a final answer."
@@ -166,8 +201,9 @@ class HRAgentTeam:
         memo = ""
         for _ in range(MAX_TURNS):
             response = self.client.messages.create(
-                model=self.model, max_tokens=2000, system=system, tools=[DELEGATE_TOOL], messages=messages)
-            self.usage.add(response)
+                model=self.model, max_tokens=MAX_TOKENS_COORDINATOR, system=system, tools=[DELEGATE_TOOL],
+                messages=messages)
+            self.usage.add(self.model, response)
             if response.stop_reason != "tool_use":
                 memo = _text(response)
                 break
@@ -192,5 +228,6 @@ class HRAgentTeam:
         else:
             memo = "The coordinator did not finish within the turn limit."
         self._emit(type="memo", text=memo)
+        by_model = {m: (v[0], v[1]) for m, v in self.usage.by_model.items()}
         return RunResult(memo=memo, events=self.events, input_tokens=self.usage.input,
-                         output_tokens=self.usage.output)
+                         output_tokens=self.usage.output, usage_by_model=by_model, cost_usd=estimate_cost(by_model))

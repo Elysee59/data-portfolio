@@ -5,7 +5,7 @@ from types import SimpleNamespace as NS
 
 import pytest
 
-from hr_agents import HRAgentTeam, run_offline
+from hr_agents import HRAgentTeam, estimate_cost, run_offline
 from hr_agents.offline import route
 from hr_agents.tools import TOOLS, call_tool, pay_gap_analysis
 
@@ -69,7 +69,8 @@ class FakeClient:
 
     def create(self, *, model, max_tokens, system, tools, messages):
         with self.lock:
-            self.calls.append({"system": system, "tools": [t["name"] for t in tools], "messages": messages})
+            self.calls.append({"system": system, "tools": [t["name"] for t in tools], "messages": messages,
+                               "model": model, "max_tokens": max_tokens})
         last = messages[-1]["content"]
         is_coordinator = "Head of People Analytics for" in system
         if is_coordinator:
@@ -108,3 +109,21 @@ def test_unknown_specialist_is_reported_as_error():
             return resp([text("done")], "end_turn")
 
     assert HRAgentTeam(client=BadClient(), model="fake").run("q").memo == "done"
+
+
+def test_specialists_use_the_cheaper_model_and_cost_is_computed():
+    client = FakeClient()
+    result = HRAgentTeam(client=client, model="claude-sonnet-5-5", specialist_model="claude-haiku-5-5").run("q")
+    coord = [c for c in client.calls if "Head of People Analytics for" in c["system"]]
+    spec = [c for c in client.calls if "Head of People Analytics for" not in c["system"]]
+    assert {c["model"] for c in coord} == {"claude-sonnet-5-5"}
+    assert {c["model"] for c in spec} == {"claude-haiku-5-5"}
+    assert all(c["max_tokens"] <= 700 for c in spec)
+    assert result.usage_by_model["claude-haiku-5-5"] == (10 * len(spec), 5 * len(spec))
+    expected = (10 * len(coord) * 2 + 5 * len(coord) * 10 + 10 * len(spec) * 0.10 + 5 * len(spec) * 0.50) / 1e6
+    assert result.cost_usd == pytest.approx(expected)
+
+
+def test_cost_unknown_model_is_none():
+    assert estimate_cost({"some-future-model": (1000, 100)}) is None
+    assert estimate_cost({"claude-sonnet-5-5": (6421, 3032)}) == pytest.approx(0.043162)

@@ -9,7 +9,8 @@ from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ct
 from app_utils import ROOT, hero, insight, setup
 
 sys.path.insert(0, str(ROOT / "04-hr-multi-agent" / "src"))
-from hr_agents import SPECIALISTS, HRAgentTeam, run_offline  # noqa: E402
+from hr_agents import HRAgentTeam, run_offline  # noqa: E402
+from hr_agents.agents import DEFAULT_MODEL, DEFAULT_SPECIALIST_MODEL  # noqa: E402
 
 setup("HR Agent Team", "🤖")
 hero("🤖 HR Agent Team", "Ask a question about the workforce. A coordinator agent briefs three specialist agents, "
@@ -24,7 +25,20 @@ def secret(name: str) -> str | None:
         return os.environ.get(name)
 
 
-API_KEY, MODEL = secret("ANTHROPIC_API_KEY"), secret("ANTHROPIC_MODEL")
+API_KEY = secret("ANTHROPIC_API_KEY")
+MODEL = secret("ANTHROPIC_MODEL") or DEFAULT_MODEL
+SPEC_DEFAULT = secret("ANTHROPIC_SPECIALIST_MODEL") or DEFAULT_SPECIALIST_MODEL
+
+
+@st.cache_resource
+def answer_cache() -> dict:
+    """Answers already paid for, shared by all visitors of this app instance (cleared on restart)."""
+    return {}
+
+
+def cache_key(q: str, coord: str, spec: str) -> tuple:
+    return " ".join(q.lower().split()), coord, spec
+
 ICONS = {"turnover": "📉", "pay_equity": "⚖️", "retention_risk": "🎯"}
 SUGGESTIONS = [
     "Give me a full HR health check for 2025.",
@@ -48,8 +62,13 @@ digraph {
   Q -> C; C -> T; C -> P; C -> R; T -> D; P -> D; R -> D; C -> M;
 }""", use_container_width=True)
     if API_KEY:
-        st.success(f"Live mode: agents run on Claude ({MODEL or 'default model'}).")
+        st.success(f"Live mode: the coordinator runs on **{MODEL}**.")
+        options = list(dict.fromkeys([SPEC_DEFAULT, "claude-haiku-5-5", MODEL]))
+        spec_model = st.selectbox("Specialists' model", options, index=0,
+                                  help="Specialists do simple work (pick a tool, read figures, summarise). "
+                                       "Haiku is about 20× cheaper than Sonnet.")
     else:
+        spec_model = None
         st.info("**Offline demo mode.** No API key is configured, so the specialists run their standard tool plan "
                 "and the memo is assembled from a template. Same team, same tools, same trace, without an LLM.")
 
@@ -63,6 +82,7 @@ with left:
             st.session_state.question = s
     question = st.text_area("Question", key="question", height=90, label_visibility="collapsed")
     run = st.button("Run the team", type="primary", use_container_width=True)
+    fresh = st.checkbox("Ignore saved answers (always ask the agents again)", value=False) if API_KEY else False
 
 st.divider()
 
@@ -89,13 +109,21 @@ if run and question.strip():
                                     state="complete", expanded=False)
 
     ctx = get_script_run_ctx()
+    cached = False
     try:
         if API_KEY:
-            os.environ["ANTHROPIC_API_KEY"] = API_KEY
-            team = HRAgentTeam(model=MODEL, on_event=on_event,
-                               thread_setup=lambda: add_script_run_ctx(threading.current_thread(), ctx))
-            with st.spinner("The coordinator is briefing the team…"):
-                result = team.run(question)
+            key = cache_key(question, MODEL, spec_model)
+            if not fresh and key in answer_cache():
+                result, cached = answer_cache()[key], True
+                for e in result.events:  # replay the saved trace
+                    on_event(e)
+            else:
+                os.environ["ANTHROPIC_API_KEY"] = API_KEY
+                team = HRAgentTeam(model=MODEL, specialist_model=spec_model, on_event=on_event,
+                                   thread_setup=lambda: add_script_run_ctx(threading.current_thread(), ctx))
+                with st.spinner("The coordinator is briefing the team…"):
+                    result = team.run(question)
+                answer_cache()[key] = result
         else:
             result = run_offline(question, on_event=on_event)
     except Exception as exc:  # network, quota, invalid key…
@@ -107,9 +135,15 @@ if run and question.strip():
         st.markdown(result.memo)
     c1, c2 = st.columns([1, 2])
     c1.download_button("Download the memo (.md)", result.memo, file_name="hr_memo.md", use_container_width=True)
-    if result.input_tokens:
-        c2.caption(f"Tokens used: {result.input_tokens:,} in / {result.output_tokens:,} out · "
-                   f"{sum(e['type'] == 'tool_call' for e in result.events)} tool calls")
+    if cached:
+        c2.info("♻️ Saved answer reused: this exact question was already asked, so it cost **$0**. "
+                "Tick *Ignore saved answers* to ask the agents again.")
+    elif result.input_tokens:
+        detail = " · ".join(f"{m}: {i:,} in / {o:,} out" for m, (i, o) in result.usage_by_model.items())
+        cost = f"≈ **${result.cost_usd:.3f}**" if result.cost_usd is not None else "cost unknown for this model"
+        c2.markdown(f"Cost of this answer: {cost}  \n"
+                    f"<span class='small'>{detail} · {sum(e['type'] == 'tool_call' for e in result.events)} tool calls"
+                    f"</span>", unsafe_allow_html=True)
     with st.expander("Full event trace (JSON)"):
         st.code(json.dumps(result.events, default=str, indent=1)[:20000], language="json")
 else:

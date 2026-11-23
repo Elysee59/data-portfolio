@@ -64,3 +64,8 @@ def test_agent_team_live_mode_with_fake_claude(monkeypatch):
     assert not at.exception, at.exception
     assert any("LIVE MEMO" in m.value for m in at.markdown)
     assert len(at.status) == 3
+    assert any("Cost of this answer" in m.value for m in at.markdown)
+    # Same question again: served from the cache, no new API call
+    [b for b in at.button if b.label == "Run the team"][0].click().run()
+    assert not at.exception, at.exception
+    assert any("Saved answer reused" in i.value for i in at.info)
