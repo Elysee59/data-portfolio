@@ -23,3 +23,5 @@ jobs:
       - name: Forecasting runs end to end
         working-directory: 02-sales-forecasting
         run: python src/generate_data.py && python src/forecast.py
+      - name: Streamlit app smoke tests
+        run: pytest -q tests

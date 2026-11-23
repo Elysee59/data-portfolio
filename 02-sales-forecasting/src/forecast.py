@@ -89,6 +89,9 @@ def main() -> None:
     sales = pd.read_csv(ROOT / "data" / "sales.csv", parse_dates=["date"])
     w = add_features(weekly(sales))
     preds, scores = backtest(w)
+    # Saved for the Streamlit app, so it does not have to re-run the backtest
+    cols = ["cutoff", "week", "store_id", "family", "units", "pred_gbm", "pred_seasonal", "pred_naive"]
+    preds[cols].round(1).to_csv(ROOT / "data" / "backtest_predictions.csv", index=False)
 
     # Chart 1: total weekly units, actual vs. forecasts on the backtest window (the 4th week after each cut-off)
     first = preds[preds.week == preds.cutoff + pd.Timedelta(weeks=HORIZON)]

@@ -11,9 +11,9 @@ Base leaving rate: 15.5%
 
 | Model | ROC AUC | PR AUC |
 |---|---|---|
-| Logistic regression | 0.675 | 0.307 |
+| Logistic regression | 0.675 | 0.305 |
 | Gradient boosting | 0.634 | 0.240 |
 
 The 20 % of employees with the highest risk score account for **41%** of actual leavers (test set).
 
-Top drivers: engagement_score, salary_to_market_ratio, avg_monthly_overtime_h, department
+Top drivers: engagement_score, avg_monthly_overtime_h, salary_to_market_ratio, department

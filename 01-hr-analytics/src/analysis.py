@@ -79,7 +79,7 @@ def attrition_model(df: pd.DataFrame):
 
     pre = ColumnTransformer([("num", StandardScaler(), num), ("cat", OneHotEncoder(handle_unknown="ignore"), cat)])
     models = {
-        "Logistic regression": Pipeline([("pre", pre), ("clf", LogisticRegression(max_iter=2000, class_weight="balanced"))]),
+        "Logistic regression": Pipeline([("pre", pre), ("clf", LogisticRegression(max_iter=2000))]),
         "Gradient boosting": Pipeline([("pre", pre), ("clf", HistGradientBoostingClassifier(max_depth=3, learning_rate=0.05, max_iter=300, random_state=0))]),
     }
     scores = {}
@@ -94,7 +94,7 @@ def attrition_model(df: pd.DataFrame):
     p = models[best].predict_proba(X_te)[:, 1]
     top = p >= np.quantile(p, 0.8)
     capture = y_te[top].sum() / y_te.sum()
-    return scores, best, importance, y.mean(), capture
+    return scores, best, importance, y.mean(), capture, models[best]
 
 
 def main() -> None:
@@ -143,7 +143,7 @@ def main() -> None:
     fig.savefig(FIG / "pay_gap.png")
     plt.close(fig)
 
-    scores, best, importance, base_rate, capture = attrition_model(df)
+    scores, best, importance, base_rate, capture, _ = attrition_model(df)
     fig, ax = plt.subplots(figsize=(7, 4))
     ax.barh(importance.index, importance.values, color=COLORS["main"])
     ax.set_xlabel("Drop in ROC AUC when the feature is shuffled")
